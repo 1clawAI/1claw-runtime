@@ -88,6 +88,15 @@ pub struct RuntimeSpec {
     pub secret_mounts: Vec<SecretMount>,
     /// Sidecar image override (defaults to latest stable).
     pub sidecar_image: Option<String>,
+    /// Whether interactive shell access is enabled for this runtime.
+    #[serde(default)]
+    pub shell_access_enabled: bool,
+    /// Authentication policy for shell sessions (`password`, `totp`, `passkey`).
+    #[serde(default = "default_shell_auth_policy")]
+    pub shell_auth_policy: String,
+    /// Maximum shell session duration in minutes.
+    #[serde(default = "default_shell_max_session_minutes")]
+    pub shell_max_session_minutes: i32,
 }
 
 impl RuntimeSpec {
@@ -106,6 +115,14 @@ fn default_http_port() -> u16 {
 
 fn default_inbound_auth() -> InboundAuth {
     InboundAuth::ApiKey
+}
+
+fn default_shell_auth_policy() -> String {
+    "password".to_string()
+}
+
+fn default_shell_max_session_minutes() -> i32 {
+    30
 }
 
 /// Inbound authentication mode for exposed runtimes.
@@ -145,6 +162,9 @@ pub struct RuntimeHandle {
     /// Provider-specific metadata (container ID, pod name, etc.).
     #[serde(default)]
     pub metadata: HashMap<String, String>,
+    /// Whether interactive shell access is enabled.
+    #[serde(default)]
+    pub shell_access_enabled: bool,
 }
 
 /// Runtime lifecycle status.
@@ -245,6 +265,9 @@ pub struct RuntimeSpecBuilder {
     inbound_auth: InboundAuth,
     secret_mounts: Vec<SecretMount>,
     sidecar_image: Option<String>,
+    shell_access_enabled: bool,
+    shell_auth_policy: String,
+    shell_max_session_minutes: i32,
 }
 
 impl RuntimeSpecBuilder {
@@ -313,6 +336,21 @@ impl RuntimeSpecBuilder {
         self
     }
 
+    pub fn shell_access(mut self, enabled: bool) -> Self {
+        self.shell_access_enabled = enabled;
+        self
+    }
+
+    pub fn shell_auth_policy(mut self, policy: &str) -> Self {
+        self.shell_auth_policy = policy.to_string();
+        self
+    }
+
+    pub fn shell_max_session_minutes(mut self, minutes: i32) -> Self {
+        self.shell_max_session_minutes = minutes;
+        self
+    }
+
     pub fn build(self) -> RuntimeSpec {
         RuntimeSpec {
             name: self.name.unwrap_or_else(|| "runtime".to_string()),
@@ -328,6 +366,9 @@ impl RuntimeSpecBuilder {
             inbound_auth: self.inbound_auth,
             secret_mounts: self.secret_mounts,
             sidecar_image: self.sidecar_image,
+            shell_access_enabled: self.shell_access_enabled,
+            shell_auth_policy: if self.shell_auth_policy.is_empty() { "password".to_string() } else { self.shell_auth_policy },
+            shell_max_session_minutes: if self.shell_max_session_minutes == 0 { 30 } else { self.shell_max_session_minutes },
         }
     }
 }
